@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>반감기와 암석의 절대연령</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#1f2937; --muted:#6b7280; --border:#d1d5db; --panel:#f9fafb;
+  --parent:#2563eb; --daughter:#ea580c; --accent:#2563eb; --ok:#15803d; --bad:#b91c1c;
+  --rock:#d6d3d1; --g1:#a8a29e; --g2:#e7e5e4; --g3:#78716c;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#111827; --fg:#f3f4f6; --muted:#9ca3af; --border:#374151; --panel:#1f2937;
+    --parent:#60a5fa; --daughter:#fb923c; --accent:#60a5fa; --ok:#4ade80; --bad:#f87171;
+    --rock:#4b5563; --g1:#6b7280; --g2:#9ca3af; --g3:#374151;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:Pretendard,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;background:var(--bg);color:var(--fg);font-size:17px;line-height:1.55}
+.wrap{max-width:1120px;margin:0 auto;padding:16px}
+h1{font-size:26px;margin:0 0 2px}
+h2{font-size:18px;margin:0 0 8px}
+.sub{color:var(--muted);font-size:15px;margin:0 0 12px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.tabs button{font:inherit;font-size:17px;padding:10px 18px;background:none;border:none;border-bottom:3px solid transparent;color:var(--muted);cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--fg);font-weight:700;border-bottom-color:var(--accent)}
+.panel{border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--panel)}
+.controls{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin-bottom:12px}
+.controls label{display:flex;gap:8px;align-items:center}
+select,input[type=number]{font:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg)}
+input[type=number]{width:110px}
+.grid2{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:12px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+button.btn{font:inherit;padding:9px 16px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+button.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+button.btn:disabled{opacity:.4;cursor:not-allowed}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.particles{display:grid;gap:4px}
+.p{aspect-ratio:1;border-radius:50%;background:var(--parent);transition:background .6s,transform .6s}
+.p.d{background:var(--daughter)}
+.p.flash{animation:flash .8s}
+@keyframes flash{0%{transform:scale(1)}40%{transform:scale(1.6)}100%{transform:scale(1)}}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:15px}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.dot.p1{background:var(--parent)} .dot.d1{background:var(--daughter)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.tile{border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--bg)}
+.tile .l{font-size:13px;color:var(--muted)}
+.tile .v{font-size:26px;font-weight:700;line-height:1.2}
+.tile .s{font-size:13px;color:var(--muted)}
+.stack{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--border);margin:4px 0 12px}
+.stack span{display:block;height:100%;transition:width .6s}
+.stack .sp{background:var(--parent)} .stack .sd{background:var(--daughter)}
+.note{border-left:4px solid var(--accent);background:var(--bg);padding:10px 12px;border-radius:0 8px 8px 0;margin-top:10px;min-height:76px}
+.warn{border-left-color:var(--daughter)}
+svg text.tk{font-size:12px;fill:var(--muted)} svg text.tk2{font-size:11px;fill:var(--muted)}
+svg text.ax{font-size:12px;fill:var(--fg)} svg text.pl{font-size:13px;font-weight:700;fill:var(--fg)}
+svg line.grid{stroke:var(--border);stroke-width:1} svg line.axis{stroke:var(--fg);stroke-width:1.2}
+svg path.curve{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:5 4}
+svg circle.pt{fill:var(--parent);stroke:var(--bg);stroke-width:2}
+svg line.guide{stroke:var(--parent);stroke-width:1.2;stroke-dasharray:3 3}
+table{border-collapse:collapse;width:100%;margin-top:12px;font-size:15px}
+th,td{border:1px solid var(--border);padding:6px 10px;text-align:right}
+th{background:var(--panel)} td:first-child,th:first-child{text-align:left}
+tr.cur td{background:var(--panel);font-weight:700} tr.fut td{color:var(--muted)}
+.step{border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--bg)}
+.step.done{border-color:var(--ok)}
+.step .t{font-weight:700;margin-bottom:6px}
+.opt{font:inherit;padding:8px 16px;margin:0 6px 6px 0;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+.opt:hover{border-color:var(--accent)}
+.fb{margin-top:8px;color:var(--bad);font-size:15px}
+.hint{margin-top:8px;font-size:15px;background:var(--panel);padding:8px 10px;border-radius:6px}
+.okt{color:var(--ok);font-weight:700}
+.foot{color:var(--muted);font-size:13px;margin-top:14px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>반감기와 암석의 절대연령</h1>
+  <p class="sub">방사성 원소가 일정한 시간마다 절반씩 붕괴하는 규칙으로 암석의 나이를 알아내 봅시다.</p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" id="tabBtn1" aria-selected="true">1. 반감기 시뮬레이션</button>
+    <button role="tab" id="tabBtn2" aria-selected="false">2. 암석 연령 구하기</button>
+  </div>
+
+  <!-- ===== 탭 1 ===== -->
+  <section id="tab1">
+    <div class="controls">
+      <label>방사성 원소
+        <select id="elSel">
+          <option value="u">우라늄-238 → 납-206</option>
+          <option value="x">가상의 원소 X → Y</option>
+        </select>
+      </label>
+      <span id="hlFixed"></span>
+      <label id="hlWrap" hidden>반감기
+        <input type="range" id="hlRange" min="10" max="500" step="10" value="100">
+        <output id="hlOut"></output>
+      </label>
+    </div>
+
+    <div class="grid2">
+      <div class="panel">
+        <h2>화성암 속 광물 결정 확대</h2>
+        <svg viewBox="0 0 340 135" width="100%" role="img" aria-label="화성암 단면과 확대할 광물 결정">
+          <polygon points="20,100 40,50 90,25 160,18 230,28 290,50 320,95 270,118 150,124 70,120" fill="var(--rock)" stroke="var(--border)" stroke-width="2"/>
+          <polygon points="60,70 90,48 115,70 95,92 68,90" fill="var(--g1)"/>
+          <polygon points="120,40 160,34 175,60 140,72" fill="var(--g2)"/>
+          <polygon points="130,85 175,80 185,108 140,112" fill="var(--g3)"/>
+          <polygon points="190,40 215,38 222,52 200,60" fill="var(--g1)"/>
+          <polygon points="250,60 285,68 275,95 245,92" fill="var(--g2)"/>
+          <circle cx="215" cy="85" r="17" fill="var(--g3)" stroke="var(--accent)" stroke-width="3"/>
+          <text x="215" y="125" text-anchor="middle" class="ax" style="font-size:12px;fill:var(--accent);font-weight:700">확대할 광물 결정</text>
+          <text x="22" y="16" class="tk">화성암 단면 (마그마가 식어 굳은 암석)</text>
+        </svg>
+        <div id="particles" class="particles" style="grid-template-columns:repeat(16,1fr)" aria-label="입자 128개"></div>
+        <div class="legend">
+          <span><i class="dot p1"></i><b id="lgP"></b> (모원소)</span>
+          <span><i class="dot d1"></i><b id="lgD"></b> (자원소)</span>
+        </div>
+        <div class="btns">
+          <button class="btn" id="btnPrev">이전 단계</button>
+          <button class="btn primary" id="btnNext">다음 반감기 지나가기</button>
+          <button class="btn" id="btnReset">처음으로</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="stats">
+          <div class="tile"><div class="l">지난 반감기 횟수</div><div class="v" id="sN"></div><div class="s">&nbsp;</div></div>
+          <div class="tile"><div class="l">경과 시간</div><div class="v" id="sT"></div><div class="s" id="sT2"></div></div>
+          <div class="tile"><div class="l">모원소 남은 양</div><div class="v" id="sF"></div><div class="s" id="sF2"></div></div>
+          <div class="tile"><div class="l">모원소 : 자원소</div><div class="v" id="sR"></div><div class="s" id="sR2"></div></div>
+        </div>
+        <div class="stack" aria-hidden="true"><span class="sp" id="barP"></span><span class="sd" id="barD"></span></div>
+        <svg id="curve" viewBox="0 0 480 280" width="100%" role="img" aria-label="모원소 붕괴 곡선"></svg>
+        <div class="note" id="msg" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <table>
+      <thead><tr><th>반감기 횟수</th><th>경과 시간</th><th>모원소 비율</th><th>모원소 수</th><th>자원소 수</th><th>모원소 : 자원소</th></tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+    <p class="foot">조작: 키보드 → 다음 반감기, ← 이전 단계. 이 시뮬레이션은 반감기마다 모원소가 정확히 절반씩 붕괴하도록 단순화했습니다(실제 개별 원자의 붕괴는 확률적). 우라늄-238의 반감기는 약 44.7억 년이며 여기서는 45억 년으로 둡니다.</p>
+  </section>
+
+  <!-- ===== 탭 2 ===== -->
+  <section id="tab2" hidden>
+    <div class="controls">
+      <label>시료 종류
+        <select id="qMode">
+          <option value="x">가상의 원소 (연습용)</option>
+          <option value="u">우라늄-238 (연습용)</option>
+        </select>
+      </label>
+      <button class="btn primary" id="btnNewQ">새 문제</button>
+      <span id="solvedTxt" style="color:var(--muted)"></span>
+    </div>
+    <div class="grid2">
+      <div class="panel">
+        <h2>암석 시료 분석 결과</h2>
+        <p id="qIntro" style="margin-top:0"></p>
+        <div id="qGrid" class="particles" style="grid-template-columns:repeat(8,1fr);max-width:340px"></div>
+        <div class="legend">
+          <span><i class="dot p1"></i>모원소 <b id="qP"></b>개</span>
+          <span><i class="dot d1"></i>자원소 <b id="qD"></b>개</span>
+        </div>
+        <p class="foot" style="margin-top:10px">핵심 약속: 암석이 처음 만들어지는 순간(시간 0)에는 자원소가 없다고 봅니다. 지금 있는 자원소는 모두 모원소가 붕괴해서 생긴 것입니다.</p>
+      </div>
+      <div class="panel">
+        <h2>이 암석의 나이는?</h2>
+        <div id="qSteps"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var COLS = 16, ROWS = 8, N = COLS * ROWS, MAXSTEP = 7;
+
+  // ---------- 상태 ----------
+  var cur = { key:'u', hl:45, unit:'억 년', pName:'우라늄-238', dName:'납-206' };
+  var state = [];
+  var history = [];
+  var step = 0;
+  var pEls = [];
+
+  function shuffle(a){
+    for (var i = a.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function fmtTime(n){
+    var v = n * cur.hl;
+    return v === 0 ? '0년' : v.toLocaleString('ko-KR') + cur.unit;
+  }
+  function fmtNum(n){
+    return (n * cur.hl).toLocaleString('ko-KR');
+  }
+  function frac(n){ return n === 0 ? '1' : '1/' + Math.pow(2, n); }
+  function parentCount(){ var c = 0; for (var i = 0; i < state.length; i++){ if (state[i]) c++; } return c; }
+
+  // ---------- 입자 격자 ----------
+  function buildGrid(){
+    var box = $('particles');
+    box.innerHTML = '';
+    pEls = [];
+    for (var i = 0; i < N; i++){
+      var d = document.createElement('div');
+      d.className = 'p';
+      box.appendChild(d);
+      pEls.push(d);
+    }
+  }
+
+  function applyElement(key){
+    cur.key = key;
+    if (key === 'u'){
+      cur.hl = 45; cur.unit = '억 년'; cur.pName = '우라늄-238'; cur.dName = '납-206';
+      $('hlWrap').hidden = true;
+      $('hlFixed').hidden = false;
+      $('hlFixed').innerHTML = '반감기 <b>45억 년</b>';
+    } else {
+      cur.hl = parseInt($('hlRange').value, 10); cur.unit = '만 년'; cur.pName = '원소 X'; cur.dName = '원소 Y';
+      $('hlWrap').hidden = false;
+      $('hlFixed').hidden = true;
+      $('hlOut').textContent = cur.hl + '만 년';
+    }
+    $('lgP').textContent = cur.pName;
+    $('lgD').textContent = cur.dName;
+    resetSim();
+  }
+
+  function resetSim(){
+    state = [];
+    for (var i = 0; i < N; i++) state.push(true);
+    history = [];
+    step = 0;
+    render([]);
+  }
+
+  function nextStep(){
+    if (step >= MAXSTEP) return;
+    history.push(state.slice());
+    var idx = [];
+    for (var i = 0; i < state.length; i++){ if (state[i]) idx.push(i); }
+    shuffle(idx);
+    var k = idx.length / 2;
+    var changed = idx.slice(0, k);
+    for (var j = 0; j < changed.length; j++) state[changed[j]] = false;
+    step++;
+    render(changed);
+  }
+
+  function prevStep(){
+    if (step <= 0) return;
+    state = history.pop();
+    step--;
+    render([]);
+  }
+
+  // ---------- 설명 문구 ----------
+  function message(){
+    if (step === 0){
+      return '<b>시간 0</b> : 마그마가 식어 암석 속 광물 결정이 만들어진 순간입니다. 이때는 모원소만 있고 자원소는 없다고 봅니다. [다음 반감기 지나가기]를 눌러 보세요.';
+    }
+    var P = parentCount();
+    var before = P * 2;
+    var t = '<b>반감기 ' + step + '회 경과</b> : 직전에 남아 있던 모원소 ' + before + '개의 절반(' + P + '개)이 남고, ' + (before - P) + '개가 자원소로 변했습니다. 남은 모원소는 처음의 <b>' + frac(step) + '</b>입니다.';
+    if (step >= 2){
+      t += '<br>붕괴하는 개수는 점점 줄지만, 절반이 붕괴하는 데 걸리는 시간은 <b>항상 ' + fmtTime(1) + '</b>로 같습니다.';
+    }
+    if (step === MAXSTEP){
+      t += '<br>입자 수가 적어 여기서 멈춥니다. 실제 암석에는 엄청나게 많은 원자가 들어 있어 이 규칙이 계속 성립합니다.';
+    }
+    return t;
+  }
+
+  // ---------- 붕괴 곡선 ----------
+  function renderCurve(){
+    var W = 480, H = 280, L = 52, R = 18, T = 26, B = 64;
+    var pw = W - L - R, ph = H - T - B;
+    var X = function(n){ return L + pw * n / MAXSTEP; };
+    var Y = function(v){ return T + ph * (1 - v / 100); };
+    var s = '';
+    var ticks = [0, 25, 50, 75, 100];
+    for (var a = 0; a < ticks.length; a++){
+      var v = ticks[a];
+      s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/>';
+      s += '<text class="tk" x="' + (L - 6) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + v + '%</text>';
+    }
+    for (var n = 0; n <= MAXSTEP; n++){
+      s += '<text class="tk" x="' + X(n) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + n + '회</text>';
+      s += '<text class="tk2" x="' + X(n) + '" y="' + (H - B + 31) + '" text-anchor="middle">' + fmtNum(n) + '</text>';
+    }
+    s += '<line class="axis" x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(0) + '" y2="' + Y(0) + '"/>';
+    s += '<line class="axis" x1="' + L + '" x2="' + L + '" y1="' + T + '" y2="' + Y(0) + '"/>';
+    s += '<text class="ax" x="' + (L + pw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">반감기 횟수 / 경과 시간 (' + cur.unit + ')</text>';
+    s += '<text class="ax" x="' + L + '" y="14">모원소 남은 비율</text>';
+    var d = '';
+    for (var x = 0; x <= MAXSTEP + 0.001; x += 0.1){
+      d += (x === 0 ? 'M' : 'L') + X(x).toFixed(1) + ' ' + Y(100 * Math.pow(0.5, x)).toFixed(1) + ' ';
+    }
+    s += '<path class="curve" d="' + d + '"/>';
+    var cx = X(step), cy = Y(100 * Math.pow(0.5, step));
+    s += '<line class="guide" x1="' + cx + '" x2="' + cx + '" y1="' + cy + '" y2="' + Y(0) + '"/>';
+    s += '<line class="guide" x1="' + L + '" x2="' + cx + '" y1="' + cy + '" y2="' + cy + '"/>';
+    for (var i = 0; i <= step; i++){
+      var px = X(i), py = Y(100 * Math.pow(0.5, i));
+      s += '<circle class="pt" cx="' + px + '" cy="' + py + '" r="6"/>';
+      s += '<text class="pl" x="' + (px + 9) + '" y="' + (py - 8) + '">' + frac(i) + '</text>';
+    }
+    $('curve').innerHTML = s;
+  }
+
+  // ---------- 표 ----------
+  function renderTable(){
+    var h = '';
+    for (var i = 0; i <= MAXSTEP; i++){
+      var P = N / Math.pow(2, i), D = N - P;
+      var cls = i === step ? 'cur' : (i > step ? 'fut' : '');
+      if (i <= step){
+        h += '<tr class="' + cls + '"><td>' + i + '회</td><td>' + fmtTime(i) + '</td><td>' + frac(i) + '</td><td>' + P + '</td><td>' + D + '</td><td>1 : ' + (Math.pow(2, i) - 1) + '</td></tr>';
+      } else {
+        h += '<tr class="fut"><td>' + i + '회</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>';
+      }
+    }
+    $('logBody').innerHTML = h;
+  }
+
+  // ---------- 전체 그리기 ----------
+  function render(changed){
+    for (var i = 0; i < N; i++){
+      pEls[i].className = 'p' + (state[i] ? '' : ' d');
+    }
+    for (var c = 0; c < changed.length; c++){
+      pEls[changed[c]].classList.add('flash');
+    }
+    var P = parentCount(), D = N - P;
+    $('sN').textContent = step + '회';
+    $('sT').textContent = fmtTime(step);
+    $('sT2').textContent = '= ' + step + ' x ' + cur.hl + cur.unit;
+    $('sF').textContent = frac(step);
+    $('sF2').textContent = '모원소 ' + P + ' / ' + N + '개';
+    $('sR').textContent = P + ' : ' + D;
+    $('sR2').textContent = '= 1 : ' + (Math.pow(2, step) - 1);
+    $('barP').style.width = (P / N * 100) + '%';
+    $('barD').style.width = (D / N * 100) + '%';
+    var m = $('msg');
+    m.innerHTML = message();
+    var warn = (cur.key === 'u' && step >= 4);
+    if (warn){
+      m.innerHTML += '<br><i>※ 우라늄-238로 ' + step + '회(' + fmtTime(step) + ')는 우주의 나이(약 138억 년)보다 깁니다. 개념을 이해하기 위한 가상의 상황입니다.</i>';
+    }
+    m.className = 'note' + (warn ? ' warn' : '');
+    $('btnPrev').disabled = step === 0;
+    $('btnNext').disabled = step >= MAXSTEP;
+    renderCurve();
+    renderTable();
+  }
+
+  // ---------- 탭 전환 ----------
+  function showTab(n){
+    $('tab1').hidden = n !== 1;
+    $('tab2').hidden = n !== 2;
+    $('tabBtn1').setAttribute('aria-selected', n === 1 ? 'true' : 'false');
+    $('tabBtn2').setAttribute('aria-selected', n === 2 ? 'true' : 'false');
+    if (n === 2 && !Q) newQ();
+  }
+
+  // ================= 암석 연령 구하기 =================
+  var Q = null;
+  var solved = 0;
+  function pick(arr){ return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function newQ(){
+    var mode = $('qMode').value;
+    var o = { mode: mode, total: 64, stage: 0, finished: false, fb: '', hintOn: false };
+    if (mode === 'u'){
+      o.hl = 45; o.unit = '억 년'; o.pn = '우라늄-238'; o.dn = '납-206'; o.n = 1;
+    } else {
+      o.hl = pick([10, 20, 30, 50, 100, 200]); o.unit = '만 년'; o.pn = '원소 X'; o.dn = '원소 Y';
+      o.n = 1 + Math.floor(Math.random() * 4);
+    }
+    o.P = o.total / Math.pow(2, o.n);
+    o.D = o.total - o.P;
+    Q = o;
+    drawQ();
+  }
+
+  function stagesOf(q){
+    var fr = [];
+    for (var k = 1; k <= 5; k++) fr.push(['1/' + Math.pow(2, k), Math.pow(2, k)]);
+    var ns = [];
+    for (var m = 1; m <= 5; m++) ns.push([m + '회', m]);
+    return [
+      { title: '1단계. 처음에 있던 모원소는 모두 몇 개였을까요?', type: 'num', unit: '개', ans: q.total,
+        hint: '암석이 만들어질 때 자원소는 0개였어요. 지금 있는 자원소는 모두 붕괴한 모원소에서 생겼으므로 (모원소 + 자원소)가 처음 모원소 수입니다.',
+        done: '처음 모원소 = ' + q.P + ' + ' + q.D + ' = ' + q.total + '개' },
+      { title: '2단계. 지금 남은 모원소(' + q.P + '개)는 처음의 몇 분의 1일까요?', type: 'choice', opts: fr, ans: Math.pow(2, q.n),
+        hint: q.P + '/' + q.total + ' 을 약분해 보세요.',
+        done: q.P + '/' + q.total + ' = 1/' + Math.pow(2, q.n) },
+      { title: '3단계. 반감기를 몇 번 지났을까요?', type: 'choice', opts: ns, ans: q.n,
+        hint: '1/2이면 1회, 1/4이면 2회, 1/8이면 3회 지난 것입니다.',
+        done: '1/' + Math.pow(2, q.n) + ' = (1/2)^' + q.n + ' 이므로 반감기 ' + q.n + '회' },
+      { title: '4단계. 이 암석의 나이는 얼마일까요?', type: 'num', unit: q.unit, ans: q.n * q.hl,
+        hint: '나이 = 반감기 횟수 x 반감기 = ' + q.n + ' x ' + q.hl + q.unit,
+        done: '나이 = ' + q.n + ' x ' + q.hl + q.unit + ' = ' + (q.n * q.hl) + q.unit }
+    ];
+  }
+
+  function drawQ(){
+    var g = $('qGrid');
+    var gh = '';
+    for (var i = 0; i < Q.total; i++){
+      gh += '<div class="p' + (i < Q.P ? '' : ' d') + '"></div>';
+    }
+    g.innerHTML = gh;
+    $('qP').textContent = Q.P;
+    $('qD').textContent = Q.D;
+    $('qIntro').innerHTML = '이 화성암 시료의 광물 결정 속에서 <b>' + Q.pn + '(모원소)</b>와 <b>' + Q.dn + '(자원소)</b>를 분석했습니다. ' + Q.pn + '의 반감기는 <b>' + Q.hl + Q.unit + '</b>입니다.' + (Q.mode === 'u' ? ' (연습용 가상 시료)' : '');
+    $('solvedTxt').textContent = '해결한 문제: ' + solved + '개';
+    drawSteps();
+  }
+
+  function drawSteps(){
+    var st = stagesOf(Q);
+    var h = '';
+    for (var i = 0; i < st.length; i++){
+      var s = st[i];
+      var isDone = i < Q.stage || Q.finished;
+      if (i > Q.stage) break;
+      if (isDone){
+        h += '<div class="step done"><div class="t">' + s.title + '</div><div class="okt">정답 : ' + s.done + '</div></div>';
+      } else {
+        h += '<div class="step"><div class="t">' + s.title + '</div>';
+        if (s.type === 'num'){
+          h += '<input type="number" id="ansIn" inputmode="decimal"> ' + s.unit + ' <button class="btn" data-act="check">확인</button> ';
+        } else {
+          for (var k = 0; k < s.opts.length; k++){
+            h += '<button class="opt" data-act="pick" data-v="' + s.opts[k][1] + '">' + s.opts[k][0] + '</button>';
+          }
+        }
+        h += ' <button class="btn" data-act="hint">힌트</button>';
+        if (Q.fb) h += '<div class="fb">' + Q.fb + '</div>';
+        if (Q.hintOn) h += '<div class="hint">' + s.hint + '</div>';
+        h += '</div>';
+      }
+    }
+    if (Q.finished){
+      h += '<div class="step done"><div class="t">정리</div><div>모원소 : 자원소 = ' + Q.P + ' : ' + Q.D + ' = 1 : ' + (Math.pow(2, Q.n) - 1) + ' 이므로 반감기를 ' + Q.n + '번 지났고, 암석의 나이는 <b>' + (Q.n * Q.hl) + Q.unit + '</b>입니다.<br><button class="btn primary" data-act="newq" style="margin-top:8px">다음 문제</button></div></div>';
+    }
+    $('qSteps').innerHTML = h;
+  }
+
+  function submit(v){
+    var s = stagesOf(Q)[Q.stage];
+    if (isNaN(v)){ Q.fb = '값을 입력해 주세요.'; drawSteps(); return; }
+    if (Math.abs(v - s.ans) < 1e-9){
+      Q.fb = ''; Q.hintOn = false;
+      if (Q.stage === 3){ Q.finished = true; solved++; $('solvedTxt').textContent = '해결한 문제: ' + solved + '개'; }
+      else { Q.stage++; }
+    } else {
+      Q.fb = '아직 정답이 아니에요. 힌트를 보고 다시 생각해 보세요.';
+    }
+    drawSteps();
+  }
+
+  $('qSteps').addEventListener('click', function(e){
+    var t = e.target;
+    var act = t.getAttribute ? t.getAttribute('data-act') : null;
+    if (!act) return;
+    if (act === 'check'){ submit(parseFloat($('ansIn').value)); }
+    else if (act === 'pick'){ submit(parseFloat(t.getAttribute('data-v'))); }
+    else if (act === 'hint'){ Q.hintOn = !Q.hintOn; drawSteps(); }
+    else if (act === 'newq'){ newQ(); }
+  });
+  $('qSteps').addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && e.target.id === 'ansIn'){ submit(parseFloat(e.target.value)); }
+  });
+
+  // ---------- 이벤트 ----------
+  $('btnNext').addEventListener('click', nextStep);
+  $('btnPrev').addEventListener('click', prevStep);
+  $('btnReset').addEventListener('click', resetSim);
+  $('elSel').addEventListener('change', function(){ applyElement(this.value); });
+  $('hlRange').addEventListener('input', function(){
+    cur.hl = parseInt(this.value, 10);
+    $('hlOut').textContent = cur.hl + '만 년';
+    render([]);
+  });
+  $('tabBtn1').addEventListener('click', function(){ showTab(1); });
+  $('tabBtn2').addEventListener('click', function(){ showTab(2); });
+  $('btnNewQ').addEventListener('click', newQ);
+  $('qMode').addEventListener('change', newQ);
+  document.addEventListener('keydown', function(e){
+    if ($('tab1').hidden) return;
+    var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT') return;
+    if (e.key === 'ArrowRight'){ nextStep(); }
+    else if (e.key === 'ArrowLeft'){ prevStep(); }
+  });
+
+  // ---------- 시작 ----------
+  buildGrid();
+  applyElement('u');
+})();
+</script>
+</body>
+</html>
